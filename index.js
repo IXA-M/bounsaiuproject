@@ -26,7 +26,7 @@ const pool = mysql.createPool({
 const createTableQuery = `
 CREATE TABLE IF NOT EXISTS selection_changes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
+    username VARCHAR(255) NOT NULL UNIQUE,
     previous_country VARCHAR(255) NOT NULL,
     new_country VARCHAR(255) NOT NULL,
     change_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -41,6 +41,7 @@ pool.query(createTableQuery, (err, results) => {
     }
 });
 
+
 app.post('/logChange', (req, res) => {
     const { username, previousCountry, newCountry } = req.body;
     console.log('Received logChange request:', { username, previousCountry, newCountry });
@@ -50,17 +51,21 @@ app.post('/logChange', (req, res) => {
         return res.status(400).json({ error: 'Username is required.' });
     }
 
-    const insertQuery = `
+    const upsertQuery = `
     INSERT INTO selection_changes (username, previous_country, new_country)
     VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+    previous_country = VALUES(previous_country),
+    new_country = VALUES(new_country),
+    change_timestamp = CURRENT_TIMESTAMP
     `;
 
-    pool.query(insertQuery, [username, previousCountry, newCountry], (err, results) => {
+    pool.query(upsertQuery, [username, previousCountry, newCountry], (err, results) => {
         if (err) {
-            console.error('Error inserting data:', err);
-            return res.status(500).json({ error: 'Error inserting data', message: err.message });
+            console.error('Error inserting or updating data:', err);
+            return res.status(500).json({ error: 'Error inserting or updating data', message: err.message });
         } else {
-            console.log('Data inserted successfully:', results);
+            console.log('Data inserted or updated successfully:', results);
             return res.sendStatus(200);
         }
     });
@@ -69,5 +74,5 @@ app.post('/logChange', (req, res) => {
 
 // Start the server
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running at https://bounsaiuproject.onrender.com:${port}`);
 });
